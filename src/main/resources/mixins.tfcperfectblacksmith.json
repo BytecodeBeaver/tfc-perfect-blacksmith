@@ -1,0 +1,17 @@
+{
+  "verbose": true,
+  "required": true,
+  "package": "com.bytecodebeaver.tfcperfectblacksmith.mixin",
+  "refmap": "mixins.tfcperfectblacksmith.refmap.json",
+  "compatibilityLevel": "JAVA_17",
+  "mixins": [
+    "AnvilEntityMixin"
+  ],
+  "client": [
+  ],
+  "server": [
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}
