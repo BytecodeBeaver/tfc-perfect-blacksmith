@@ -70,6 +70,7 @@ public abstract class AnvilEntityMixin extends InventoryBlockEntity<AnvilBlockEn
 
     @Inject(method = "work", at = @At("RETURN"), remap = false)
     private void postAnvilWorkHook(ServerPlayer player, ForgeStep step, CallbackInfoReturnable<InteractionResult> cir) {
-        MinecraftForge.EVENT_BUS.post(new TFCAnvilWorkEvent((AnvilBlockEntity)(Object)this, inventory, player, step));
+        MinecraftForge.EVENT_BUS.post(new TFCAnvilWorkEvent.Post((AnvilBlockEntity)(Object)this, inventory, player, step, cir.getReturnValue()));
+
     }
 }

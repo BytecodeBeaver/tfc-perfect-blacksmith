@@ -13,6 +13,7 @@ import net.dries007.tfc.common.recipes.AnvilRecipe;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.InteractionResult;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.TooltipFlag;
 import net.minecraft.world.level.Level;
@@ -50,14 +51,16 @@ public class AnvilEventHandler {
     }
 
     @SubscribeEvent
-    public void postAnvilWork(TFCAnvilWorkEvent anvilWorkEvent) {
+    public void postAnvilWork(TFCAnvilWorkEvent.Post anvilWorkEvent) {
+        // Do nothing if for some reason interaction failed
+        if(anvilWorkEvent.getInteractionResult() == InteractionResult.FAIL) return;
+
         // If action was matching, It's fine. But If user issued wrong action, then we need to find new optimal steps
         if(optimalSteps.isEmpty()) return;
 
         ForgeStep nextOptimalStep = optimalSteps.peek();
         if(anvilWorkEvent.getStep().equals(nextOptimalStep)) {
             optimalSteps.remove();
-            displayNextOptimalStep();
         } else {
             // User made a mistake - We need to create new set of optimal actions as old one is invalid
             optimalSteps = getOptimalAnvilSteps(
@@ -65,7 +68,7 @@ public class AnvilEventHandler {
                     anvilWorkEvent.getInventory()
             );
         }
-
+        displayNextOptimalStep();
     }
 
     private Queue<ForgeStep> getOptimalAnvilSteps(AnvilBlockEntity anvil, IItemHandlerModifiable anvilInventory) {

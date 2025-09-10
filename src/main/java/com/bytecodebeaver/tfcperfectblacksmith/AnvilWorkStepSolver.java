@@ -8,7 +8,7 @@ import net.dries007.tfc.common.capabilities.forge.ForgeStep;
 import java.util.*;
 
 public class AnvilWorkStepSolver {
-    private static int MIN_SUM = 0;
+    private static int MIN_SUM = -100;
     private static int MAX_SUM = 150;
 
     private ForgeStep getBiggestFittingStep(int value) {
@@ -90,57 +90,22 @@ public class AnvilWorkStepSolver {
      * @return List of ForgeSteps to reach given target, including last operations
      */
     public List<ForgeStep> solve(int target, int current, ForgeRule[] lastSteps) {
-        System.out.println("Before <3");
-        if(lastSteps.length < 3) return new ArrayList<>();
-
         ForgeRuleAccessor[] forgeRule = (ForgeRuleAccessor[]) (Object)lastSteps;
 
-        var last = forgeRule[0].getType();
-        var secondLast = forgeRule[1].getType();
-        var thirdLast = forgeRule[2].getType();
+        var lastStepsSum = Arrays.stream(forgeRule).mapToInt(forgeRuleAccessor -> forgeRuleAccessor.getType().step()).sum();
 
         // Solve with ommiting part that must be present
         List<ForgeStep> optimalSteps = solveInternal(
-                target - current - last.step() - secondLast.step() - thirdLast.step()
+                target - current - lastStepsSum
         );
 
         if(optimalSteps == null) return new ArrayList<>();
 
         // Add fixed steps
-        optimalSteps.add(thirdLast);
-        optimalSteps.add(secondLast);
-        optimalSteps.add(last);
+        for(int i = forgeRule.length - 1;i>=0;i--) {
+            optimalSteps.add(forgeRule[i].getType());
+        }
 
         return optimalSteps;
     }
-    /*
-    public Queue<ForgeStep> solve(int target, int current, ForgeRule[] lastSteps) {
-        Queue<ForgeStep> stepsQueue = new LinkedList<>();
-
-        if(lastSteps.length < 3) return new LinkedList();
-
-        ForgeRuleAccessor[] forgeRule = (ForgeRuleAccessor[]) (Object)lastSteps;
-
-        var last = forgeRule[3].getType();
-        var secondLast = forgeRule[2].getType();
-        var thirdLast = forgeRule[1].getType();
-
-        // Hit light can be any hit - Find which one is most optimal
-        int offsettedTarget = target - last.step() - secondLast.step() - thirdLast.step() - current;
-
-        // Reduce offsetedTarget until biggest item no longer fit, then use lower value one adn repeat
-        while (offsettedTarget != 0) {
-            ForgeStep nextStep = getBiggestFittingStep(offsettedTarget);
-            stepsQueue.add(nextStep);
-            offsettedTarget -= nextStep.step();
-        }
-
-        // Add last steps
-        stepsQueue.add(thirdLast);
-        stepsQueue.add(secondLast);
-        stepsQueue.add(last);
-
-        return stepsQueue;
-    }
-     */
 }
