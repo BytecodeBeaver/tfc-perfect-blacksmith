@@ -44,10 +44,10 @@ import java.util.Queue;
         //InventoryBlockEntity.class
 })
 public abstract class AnvilEntityMixin extends InventoryBlockEntity<AnvilBlockEntity.AnvilInventory> {
-    @Shadow
+    @Shadow(remap = false)
     @Final
     public static int SLOT_INPUT_MAIN;
-    @Shadow
+    @Shadow(remap = false)
     @Final
     public static int SLOT_INPUT_SECOND;
     private static final Logger LOGGER = LogUtils.getLogger();

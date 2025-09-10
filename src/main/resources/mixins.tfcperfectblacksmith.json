@@ -5,7 +5,8 @@
   "refmap": "mixins.tfcperfectblacksmith.refmap.json",
   "compatibilityLevel": "JAVA_17",
   "mixins": [
-    "AnvilEntityMixin"
+    "AnvilEntityMixin",
+    "ForgeRuleAccessor"
   ],
   "client": [
   ],

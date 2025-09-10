@@ -1,6 +1,7 @@
 package com.bytecodebeaver.tfcperfectblacksmith;
 
 import com.mojang.logging.LogUtils;
+import com.bytecodebeaver.tfcperfectblacksmith.events.TFCAnvilClosedEvent;
 import com.bytecodebeaver.tfcperfectblacksmith.events.TFCAnvilOpenedEvent;
 import com.bytecodebeaver.tfcperfectblacksmith.events.TFCAnvilWorkEvent;
 import net.dries007.tfc.common.blockentities.AnvilBlockEntity;
@@ -9,20 +10,23 @@ import net.dries007.tfc.common.capabilities.forge.ForgeStep;
 import net.dries007.tfc.common.capabilities.forge.Forging;
 import net.dries007.tfc.common.capabilities.forge.ForgingCapability;
 import net.dries007.tfc.common.recipes.AnvilRecipe;
+import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.TooltipFlag;
 import net.minecraft.world.level.Level;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.items.IItemHandlerModifiable;
 import org.slf4j.Logger;
 
+import java.util.List;
 import java.util.Queue;
 
 @Mod.EventBusSubscriber(modid = TfcPerfectBlacksmith.MODID)
 public class AnvilEventHandler {
-    private Queue<ForgeStep> optimalSteps;
+    private List<ForgeStep> optimalSteps;
 
     private static final Logger LOGGER = LogUtils.getLogger();
 
@@ -44,12 +48,15 @@ public class AnvilEventHandler {
     @SubscribeEvent
     public void onAnvilWork(TFCAnvilWorkEvent anvilWorkEvent) {
         // If action was matching, It's fine. But If user issued wrong action, then we need to find new optimal steps
+
+
         /*
         ForgeStep nextOptimalStep = optimalSteps.peek();
         if(anvilWorkEvent.getStep() != nextOptimalStep) {
-            // User made a mistake - We need to create new set of optimal actions
+            // User made a mistake - We need to create new set of optimal actions as old one is invalid
 
-        }*/
+        }
+        */
 
 
 
@@ -73,6 +80,12 @@ public class AnvilEventHandler {
         );
         if(currentAnvilRecipe == null) return;
 
+        final ItemStack stack = event.getInventory().getStackInSlot(AnvilBlockEntity.SLOT_INPUT_MAIN);
+        if (stack.isEmpty()) return;
+
+        final Forging forge = ForgingCapability.get(stack);
+        if(forge == null) return;
+
         // TODO: Probably Forge.getWorkTarget() is the intended way
         int target = currentAnvilRecipe.computeTarget((AnvilBlockEntity.AnvilInventory)event.getInventory());
         LOGGER.debug("Opened anvil and computed target value of: {}", target);
@@ -80,7 +93,21 @@ public class AnvilEventHandler {
         // Load optimal steps
         AnvilWorkStepSolver anvilWorkStepSolver = new AnvilWorkStepSolver();
         optimalSteps = anvilWorkStepSolver.solve(
-                target, currentAnvilRecipe.getRules()
+                target, forge.getWork(), currentAnvilRecipe.getRules()
+        );
+
+        StringBuilder stepsTextBuilder = new StringBuilder();
+
+        for(ForgeStep step : optimalSteps) {
+            stepsTextBuilder.append(step.name());
+            stepsTextBuilder.append(" ");
+        }
+
+        String stepsText = stepsTextBuilder.toString();
+
+        ItemStack itemStack = event.getInventory().getStackInSlot(AnvilBlockEntity.SLOT_INPUT_MAIN);
+        Minecraft.getInstance().player.sendSystemMessage(
+                Component.literal(stepsText)
         );
     }
 }
