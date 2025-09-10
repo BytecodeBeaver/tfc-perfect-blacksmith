@@ -21,12 +21,16 @@ import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.items.IItemHandlerModifiable;
 import org.slf4j.Logger;
 
+import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Queue;
 
 @Mod.EventBusSubscriber(modid = TfcPerfectBlacksmith.MODID)
 public class AnvilEventHandler {
-    private List<ForgeStep> optimalSteps;
+    private Queue<ForgeStep> optimalSteps = null;
+    private Iterator<ForgeStep> optimalStepsIterator;
+    private AnvilWorkStepSolver anvilWorkStepSolver = new AnvilWorkStepSolver();
 
     private static final Logger LOGGER = LogUtils.getLogger();
 
@@ -46,68 +50,72 @@ public class AnvilEventHandler {
     }
 
     @SubscribeEvent
-    public void onAnvilWork(TFCAnvilWorkEvent anvilWorkEvent) {
+    public void postAnvilWork(TFCAnvilWorkEvent anvilWorkEvent) {
         // If action was matching, It's fine. But If user issued wrong action, then we need to find new optimal steps
+        if(optimalSteps.isEmpty()) return;
 
-
-        /*
         ForgeStep nextOptimalStep = optimalSteps.peek();
-        if(anvilWorkEvent.getStep() != nextOptimalStep) {
+        if(anvilWorkEvent.getStep().equals(nextOptimalStep)) {
+            optimalSteps.remove();
+            displayNextOptimalStep();
+        } else {
             // User made a mistake - We need to create new set of optimal actions as old one is invalid
-
+            optimalSteps = getOptimalAnvilSteps(
+                    anvilWorkEvent.getAnvilBlockEntity(),
+                    anvilWorkEvent.getInventory()
+            );
         }
-        */
 
+    }
 
+    private Queue<ForgeStep> getOptimalAnvilSteps(AnvilBlockEntity anvil, IItemHandlerModifiable anvilInventory) {
+        AnvilRecipe currentAnvilRecipe = getCurrentAnvilRecipe(
+                anvil,
+                anvilInventory
+        );
+        if(currentAnvilRecipe == null) return new LinkedList<>();
 
-        Level level = anvilWorkEvent.getAnvilBlockEntity().getLevel();
-        var inventory = anvilWorkEvent.getInventory();
+        final ItemStack stack = anvilInventory.getStackInSlot(AnvilBlockEntity.SLOT_INPUT_MAIN);
+        if (stack.isEmpty()) return new LinkedList<>();
 
-        assert level != null;
+        final Forging forge = ForgingCapability.get(stack);
+        if(forge == null) return new LinkedList<>();
 
-        final ItemStack stack = inventory.getStackInSlot(AnvilBlockEntity.SLOT_INPUT_MAIN);
-        if (!stack.isEmpty()) {
-            final Forging forge = ForgingCapability.get(stack);
-            LOGGER.debug("Work after anvil: {}", forge.getWork() + anvilWorkEvent.getStep().step());
-        }
+        int target = forge.getWorkTarget();
+
+        return new LinkedList<>(anvilWorkStepSolver.solve(
+                target, forge.getWork(), currentAnvilRecipe.getRules()
+        ));
+    }
+
+    private void displayNextOptimalStep() {
+        if(optimalSteps.isEmpty()) return;
+
+        ForgeStep nextOptimalStep = optimalSteps.peek();
+        if(nextOptimalStep == null) return;
+
+        Minecraft.getInstance().player.sendSystemMessage(
+                Component.literal(nextOptimalStep.name())
+        );
     }
 
     @SubscribeEvent
     public void onAnvilOpen(TFCAnvilOpenedEvent event) {
-        AnvilRecipe currentAnvilRecipe = getCurrentAnvilRecipe(
+        // Load optimal steps for currently opened anvil - Might be different than the last time
+        optimalSteps = getOptimalAnvilSteps(
                 event.getAnvilBlockEntity(),
                 event.getInventory()
         );
-        if(currentAnvilRecipe == null) return;
-
-        final ItemStack stack = event.getInventory().getStackInSlot(AnvilBlockEntity.SLOT_INPUT_MAIN);
-        if (stack.isEmpty()) return;
-
-        final Forging forge = ForgingCapability.get(stack);
-        if(forge == null) return;
-
-        // TODO: Probably Forge.getWorkTarget() is the intended way
-        int target = currentAnvilRecipe.computeTarget((AnvilBlockEntity.AnvilInventory)event.getInventory());
-        LOGGER.debug("Opened anvil and computed target value of: {}", target);
-
-        // Load optimal steps
-        AnvilWorkStepSolver anvilWorkStepSolver = new AnvilWorkStepSolver();
-        optimalSteps = anvilWorkStepSolver.solve(
-                target, forge.getWork(), currentAnvilRecipe.getRules()
-        );
-
-        StringBuilder stepsTextBuilder = new StringBuilder();
-
+        /*
+        StringBuilder builder = new StringBuilder();
         for(ForgeStep step : optimalSteps) {
-            stepsTextBuilder.append(step.name());
-            stepsTextBuilder.append(" ");
+            builder.append(step.name());
         }
 
-        String stepsText = stepsTextBuilder.toString();
-
-        ItemStack itemStack = event.getInventory().getStackInSlot(AnvilBlockEntity.SLOT_INPUT_MAIN);
         Minecraft.getInstance().player.sendSystemMessage(
-                Component.literal(stepsText)
+                Component.literal(builder.toString())
         );
+        */
+        displayNextOptimalStep();
     }
 }
