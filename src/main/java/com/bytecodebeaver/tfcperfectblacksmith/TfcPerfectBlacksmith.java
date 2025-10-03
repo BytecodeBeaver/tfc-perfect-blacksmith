@@ -16,21 +16,8 @@ import org.slf4j.Logger;
 public class TfcPerfectBlacksmith {
     public static final String MODID = "tfcperfectblacksmith";
     private static final Logger LOGGER = LogUtils.getLogger();
-    /*
-    @SubscribeEvent
-    private void onLoad() {
-        LOGGER.info("TFC Perfect Blacksmith loaded!");
-    }
-
-    @Mod.EventBusSubscriber(modid = MODID, bus = Mod.EventBusSubscriber.Bus.MOD, value = Dist.CLIENT)
-    public static class ClientModEvents
-    {
-
-    }
-    */
 
     public TfcPerfectBlacksmith(FMLJavaModLoadingContext context) {
-
         MinecraftForge.EVENT_BUS.register(new AnvilEventHandler());
     }
 }

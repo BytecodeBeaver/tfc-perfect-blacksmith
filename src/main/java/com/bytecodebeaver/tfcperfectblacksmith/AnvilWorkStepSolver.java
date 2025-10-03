@@ -1,31 +1,15 @@
 package com.bytecodebeaver.tfcperfectblacksmith;
 
 import com.mojang.datafixers.util.Pair;
-import com.bytecodebeaver.tfcperfectblacksmith.mixin.ForgeRuleAccessor;
+import com.bytecodebeaver.tfcperfectblacksmith.interfaces.IForgeRuleAccessor;
+import com.bytecodebeaver.tfcperfectblacksmith.mixin.ForgeRuleAccessorMixin;
 import net.dries007.tfc.common.capabilities.forge.ForgeRule;
 import net.dries007.tfc.common.capabilities.forge.ForgeStep;
 
 import java.util.*;
 
 public class AnvilWorkStepSolver {
-    private static int MIN_SUM = -100;
     private static int MAX_SUM = 150;
-
-    private ForgeStep getBiggestFittingStep(int value) {
-        ForgeStep biggest = ForgeStep.HIT_HARD;
-        for(ForgeStep step : ForgeStep.VALUES) {
-            if(value - biggest.step() == 0) {
-                // Exact match - nothing else will fit
-                return biggest;
-            }
-
-            if(step.step() > biggest.step()) {
-                biggest = step;
-            }
-        }
-
-        return biggest;
-    }
 
     public List<ForgeStep> solve(int target, ForgeRule[] lastSteps) {
         return solve(target, 0, lastSteps);
@@ -44,8 +28,11 @@ public class AnvilWorkStepSolver {
      * @param target
      * @return List of ForgeSteps to reach given target
      */
-    private List<ForgeStep> solveInternal(int target) {
+    private List<ForgeStep> solveInternal(int target, int currentWork) {
         // TODO: Can cache it
+
+        // Handles a case where an item is worked, so we can safely subtract more without worrying that we will break it
+        int minSum = -currentWork;
 
         // BFS queue: each element is a pair of (current sum, combination list)
         Queue<Pair<Integer, List<ForgeStep>>> queue = new LinkedList<>();
@@ -69,7 +56,7 @@ public class AnvilWorkStepSolver {
                 int nextSum = currentSum + forgeStep.step();
 
                 // Only consider sums within bounds and not visited
-                if (nextSum >= MIN_SUM && nextSum <= MAX_SUM && !visited.contains(nextSum)) {
+                if (nextSum >= minSum && nextSum <= MAX_SUM && !visited.contains(nextSum)) {
                     visited.add(nextSum);
                     List<ForgeStep> nextCombination = new ArrayList<>(combination);
                     nextCombination.add(forgeStep);
@@ -82,6 +69,14 @@ public class AnvilWorkStepSolver {
         return null;
     }
 
+    private ForgeRule[] sortForgeRules(ForgeRule[] originalRules) {
+        ForgeRule[] sortedSteps = new ForgeRule[3];
+
+        // Order values are descending
+
+        return sortedSteps;
+    }
+
     /**
      * Finds anvil target value combination of ForgeStep
      * @param target
@@ -90,14 +85,18 @@ public class AnvilWorkStepSolver {
      * @return List of ForgeSteps to reach given target, including last operations
      */
     public List<ForgeStep> solve(int target, int current, ForgeRule[] lastSteps) {
-        ForgeRuleAccessor[] forgeRule = (ForgeRuleAccessor[]) (Object)lastSteps;
+        ForgeRule[] orderedRules = Arrays.stream(lastSteps).sorted(
+                Comparator.comparingInt(ForgeRule::overlayY)
+        ).toArray(ForgeRule[]::new);
+
+        IForgeRuleAccessor[] forgeRule = (IForgeRuleAccessor[]) (Object)orderedRules;
 
         var lastStepsSum = Arrays.stream(forgeRule).mapToInt(forgeRuleAccessor -> forgeRuleAccessor.getType().step()).sum();
 
         // Solve with ommiting part that must be present
         List<ForgeStep> optimalSteps = solveInternal(
                 target - current - lastStepsSum
-        );
+        , current);
 
         if(optimalSteps == null) return new ArrayList<>();
 

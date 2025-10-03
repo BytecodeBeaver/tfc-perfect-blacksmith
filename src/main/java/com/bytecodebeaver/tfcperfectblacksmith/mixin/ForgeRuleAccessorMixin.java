@@ -1,14 +1,18 @@
 package com.bytecodebeaver.tfcperfectblacksmith.mixin;
 
+import com.bytecodebeaver.tfcperfectblacksmith.interfaces.IForgeRuleAccessor;
 import net.dries007.tfc.common.capabilities.forge.ForgeRule;
 import net.dries007.tfc.common.capabilities.forge.ForgeStep;
-import org.checkerframework.checker.units.qual.A;
 import org.spongepowered.asm.mixin.Mixin;
-import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.gen.Accessor;
 
 @Mixin(ForgeRule.class)
-public interface ForgeRuleAccessor {
+public abstract class ForgeRuleAccessorMixin implements IForgeRuleAccessor {
     @Accessor(value = "type", remap = false)
-    ForgeStep getType();
+    public abstract ForgeStep getType();
+
+    @Override
+    public ForgeRule getForgeRule() {
+        return (ForgeRule)(Object) this;
+    }
 }
