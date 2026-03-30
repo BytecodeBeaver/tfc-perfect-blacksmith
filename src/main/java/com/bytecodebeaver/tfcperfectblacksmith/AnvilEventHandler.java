@@ -1,41 +1,35 @@
 package com.bytecodebeaver.tfcperfectblacksmith;
 
-import com.mojang.logging.LogUtils;
-import com.bytecodebeaver.tfcperfectblacksmith.events.TFCAnvilClosedEvent;
 import com.bytecodebeaver.tfcperfectblacksmith.events.TFCAnvilOpenedEvent;
 import com.bytecodebeaver.tfcperfectblacksmith.events.TFCAnvilWorkEvent;
 import net.dries007.tfc.common.blockentities.AnvilBlockEntity;
-import net.dries007.tfc.common.capabilities.forge.ForgeRule;
 import net.dries007.tfc.common.capabilities.forge.ForgeStep;
 import net.dries007.tfc.common.capabilities.forge.Forging;
 import net.dries007.tfc.common.capabilities.forge.ForgingCapability;
 import net.dries007.tfc.common.recipes.AnvilRecipe;
-import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.TooltipFlag;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraftforge.common.capabilities.ForgeCapabilities;
+import net.minecraftforge.event.entity.player.PlayerInteractEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.items.IItemHandlerModifiable;
-import org.slf4j.Logger;
+import net.minecraftforge.items.IItemHandler;
 
-import java.util.Iterator;
 import java.util.LinkedList;
-import java.util.List;
 import java.util.Queue;
 
 @Mod.EventBusSubscriber(modid = TfcPerfectBlacksmith.MODID)
 public class AnvilEventHandler {
     private Queue<ForgeStep> optimalSteps = null;
-    private Iterator<ForgeStep> optimalStepsIterator;
-    private AnvilWorkStepSolver anvilWorkStepSolver = new AnvilWorkStepSolver();
+    private final AnvilWorkStepSolver anvilWorkStepSolver = new AnvilWorkStepSolver();
 
-    private static final Logger LOGGER = LogUtils.getLogger();
-
-    private AnvilRecipe getCurrentAnvilRecipe(AnvilBlockEntity anvilBlockEntity, IItemHandlerModifiable inventory) {
+    private AnvilRecipe getCurrentAnvilRecipe(AnvilBlockEntity anvilBlockEntity, IItemHandler inventory) {
         Level level = anvilBlockEntity.getLevel();
 
         assert level != null;
@@ -56,7 +50,7 @@ public class AnvilEventHandler {
         if(anvilWorkEvent.getInteractionResult() == InteractionResult.FAIL) return;
 
         // If action was matching, It's fine. But If user issued wrong action, then we need to find new optimal steps
-        if(optimalSteps.isEmpty()) return;
+        if(optimalSteps == null || optimalSteps.isEmpty()) return;
 
         ForgeStep nextOptimalStep = optimalSteps.peek();
         if(anvilWorkEvent.getStep().equals(nextOptimalStep)) {
@@ -68,10 +62,10 @@ public class AnvilEventHandler {
                     anvilWorkEvent.getInventory()
             );
         }
-        displayNextOptimalStep();
+        displayNextOptimalStep(anvilWorkEvent.getPlayer());
     }
 
-    private Queue<ForgeStep> getOptimalAnvilSteps(AnvilBlockEntity anvil, IItemHandlerModifiable anvilInventory) {
+    private Queue<ForgeStep> getOptimalAnvilSteps(AnvilBlockEntity anvil, IItemHandler anvilInventory) {
         AnvilRecipe currentAnvilRecipe = getCurrentAnvilRecipe(
                 anvil,
                 anvilInventory
@@ -91,13 +85,51 @@ public class AnvilEventHandler {
         ));
     }
 
-    private void displayNextOptimalStep() {
-        if(optimalSteps.isEmpty()) return;
+    private void sendAnvilStateMessage(ServerPlayer player, AnvilBlockEntity anvil, IItemHandler anvilInventory) {
+        final ItemStack stack = anvilInventory.getStackInSlot(AnvilBlockEntity.SLOT_INPUT_MAIN);
+        if (stack.isEmpty()) {
+            player.sendSystemMessage(Component.literal("Anvil is empty."));
+            return;
+        }
+
+        final Forging forge = ForgingCapability.get(stack);
+        if (forge == null) {
+            player.sendSystemMessage(Component.literal("Workpiece in anvil: " + stack.getHoverName().getString()));
+            return;
+        }
+
+        final AnvilRecipe recipe = getCurrentAnvilRecipe(anvil, anvilInventory);
+        final String recipeId = recipe != null ? recipe.getId().toString() : "none";
+        player.sendSystemMessage(Component.literal(
+                "Workpiece: " + stack.getHoverName().getString()
+                        + " | Work: " + forge.getWork() + "/" + forge.getWorkTarget()
+                        + " | Recipe: " + recipeId
+        ));
+    }
+
+    @SubscribeEvent
+    public void onAnvilRightClick(PlayerInteractEvent.RightClickBlock event) {
+        if (!(event.getLevel() instanceof ServerLevel serverLevel)) return;
+        if (!(event.getEntity() instanceof ServerPlayer player)) return;
+
+        final BlockEntity blockEntity = serverLevel.getBlockEntity(event.getPos());
+        if (!(blockEntity instanceof AnvilBlockEntity anvilBlockEntity)) return;
+
+        // Read current anvil inventory through capabilities to avoid direct internals.
+        anvilBlockEntity.getCapability(ForgeCapabilities.ITEM_HANDLER).ifPresent(anvilInventory -> {
+            optimalSteps = getOptimalAnvilSteps(anvilBlockEntity, anvilInventory);
+            sendAnvilStateMessage(player, anvilBlockEntity, anvilInventory);
+            displayNextOptimalStep(player);
+        });
+    }
+
+    private void displayNextOptimalStep(Player player) {
+        if(player == null || optimalSteps == null || optimalSteps.isEmpty()) return;
 
         ForgeStep nextOptimalStep = optimalSteps.peek();
         if(nextOptimalStep == null) return;
 
-        Minecraft.getInstance().player.sendSystemMessage(
+        player.sendSystemMessage(
                 Component.literal(nextOptimalStep.name())
         );
     }
@@ -109,16 +141,5 @@ public class AnvilEventHandler {
                 event.getAnvilBlockEntity(),
                 event.getInventory()
         );
-        /*
-        StringBuilder builder = new StringBuilder();
-        for(ForgeStep step : optimalSteps) {
-            builder.append(step.name());
-        }
-
-        Minecraft.getInstance().player.sendSystemMessage(
-                Component.literal(builder.toString())
-        );
-        */
-        displayNextOptimalStep();
     }
 }
